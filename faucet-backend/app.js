@@ -149,7 +149,7 @@ app.post('/increment', async (req, res) => {
         const firstApiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
         const firstRequestData = {
           comment: "",
-          receiver: "bafybmiesr2x772guu7o4qfxywpdyqixlfcvpbocr4jgyij4ou2ff4l55aq",
+          receiver: username,
           sender: "bafybmiftqpvkq6sibrpjr3biallzbrmdwumlkwa37spo7iwdaxqpcpgdgm",
           tokenCount: 1.0,
           type: 2

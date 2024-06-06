@@ -4,15 +4,18 @@ import './App.css';
 function App() {
   const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('');
 
   const submitUsername = async () => {
     if (!username) {
-      setMessage('Please enter a username.');
+      setMessage('Please enter DID.');
+      setMessageType('error')
       return;
     }
 
     if (!username.startsWith('bafyb')) {
-      setMessage('Username must start with "bafyb".');
+      setMessage('DID must start with "bafyb".');
+      setMessageType('error');
       return;
     }
 
@@ -29,28 +32,29 @@ function App() {
       setMessage(result);
 
       if (response.status === 429) {
-        document.getElementById('message').style.color = 'red';
+        setMessageType('error')
       } else {
-        document.getElementById('message').style.color = 'green';
+        setMessageType('success')
+        setUsername('');
       }
     } catch (error) {
-      setMessage('Error submitting username.');
-      document.getElementById('message').style.color = 'red';
+      setMessage('Error submitting DID.');
+      setMessageType('error')
     }
   };
 
   return (
     <div className="container">
       <img src="/rubix-logo.png" alt="Rubix Logo" className="logo" />
-      <h1>Increment Counter</h1>
+      <h1>Rubix Faucet</h1>
       <input
         type="text"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
-        placeholder="Enter username"
+        placeholder="Enter DID"
       />
       <button onClick={submitUsername}>Submit</button>
-      <div className="message" id="message">{message}</div>
+      <div className={'message ${messageType}'}>{message}</div>
     </div>
   );
 }

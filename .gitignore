@@ -1,0 +1,28 @@
+# Node.js
+node_modules/
+**/node_modules/
+*.log
+**/*.log
+*.lock
+**/*.lock
+*.json
+**/package-lock.json
+**/*.db
+# Build output
+dist/
+build/
+public/build/
+.env
+.env.local
+.env.*.local
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+**/*.DS_Store
+
+
+# Yarn Integrity file
+.yarn-integrity
+

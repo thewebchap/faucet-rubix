@@ -2,8 +2,10 @@ const express = require('express');
 const fs = require('fs-extra');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet'); // for security headers
 const app = express();
-const port = 3000;
+const port = 3001;
 const crypto = require('crypto');
 const axios = require('axios');
 const counterFilePath = 'counter.json';
@@ -60,16 +62,29 @@ const initializeCounter = async () => {
     counter = await readCounterFromFile();
 };
 
-// Middleware to parse JSON bodies
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: 'http://103.209.145.177:3000',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+}));
+// Security headers
+app.use(helmet());
+
+// Rate limiter for the /increment endpoint
+const limiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+});
+app.use('/increment', limiter);
 
 // Increment the counter and save it to the file
 app.post('/increment', async (req, res) => {
     const { username } = req.body;
 
-    if (!username) {
-        return res.status(400).send('Username is required');
+    if (!username || typeof username !== 'string') {
+        return res.status(400).send('Username is required and must be a string');
     }
 
     const currentTime = Date.now();

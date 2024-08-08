@@ -77,7 +77,14 @@ const limiter = rateLimit({
     max: 200, // Limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
 });
-app.use('/increment', limiter);
+app.use('/increment', (req, res, next) => {
+    const source_ip = req.ip; // Get the requester's IP address
+    if (source_ip === '103.209.145.177') {
+        next(); // Skip the rate limiter for this IP
+    } else {
+        limiter(req, res, next); // Apply the rate limiter
+    }
+});
 
 // Increment the counter and save it to the file
 app.post('/increment', async (req, res) => {

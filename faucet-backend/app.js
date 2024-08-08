@@ -64,7 +64,7 @@ const initializeCounter = async () => {
 
 app.use(express.json());
 app.use(cors({
-    origin: '*' ,//'http://103.209.145.177:3000',
+    origin: 'http://103.209.145.177:3000',
     methods: ['GET', 'POST','OPTIONS'],
     allowedHeaders: ['Content-Type'],
 }));
@@ -73,7 +73,7 @@ app.use(helmet());
 
 // Rate limiter for the /increment endpoint
 const limiter = rateLimit({
-    windowMs: 1000, // 1 sec
+    windowMs: 60 * 60 * 1000, // 1 sec
     max: 200, // Limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
 });

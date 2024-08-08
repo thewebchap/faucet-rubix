@@ -73,8 +73,8 @@ app.use(helmet());
 
 // Rate limiter for the /increment endpoint
 const limiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 sec
-    max: 200, // Limit each IP to 100 requests per windowMs
+    windowMs: 60 * 60 * 1000, // 60 Mins
+    max: 200, // Limit each IP to 200 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/increment', (req, res, next) => {

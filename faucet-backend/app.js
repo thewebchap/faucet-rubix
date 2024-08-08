@@ -64,7 +64,7 @@ const initializeCounter = async () => {
 
 app.use(express.json());
 app.use(cors({
-    origin: 'http://103.209.145.177:3000',
+    origin: '*' ,//'http://103.209.145.177:3000',
     methods: ['GET', 'POST','OPTIONS'],
     allowedHeaders: ['Content-Type'],
 }));
@@ -215,7 +215,7 @@ app.post('/increment', async (req, res) => {
 
 // Start the server after initializing the counter
 initializeCounter().then(() => {
-    app.listen(port, () => {
+    app.listen(port,'0.0.0.0', () => {
         console.log(`Server is running on http://localhost:${port}`);
     });
 }).catch(err => {

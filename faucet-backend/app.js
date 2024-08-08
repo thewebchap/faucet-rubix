@@ -65,7 +65,7 @@ const initializeCounter = async () => {
 app.use(express.json());
 app.use(cors({
     origin: 'http://103.209.145.177:3000',
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST','OPTIONS'],
     allowedHeaders: ['Content-Type'],
 }));
 // Security headers
@@ -87,6 +87,7 @@ app.post('/increment', async (req, res) => {
         return res.status(400).send('Username is required and must be a string');
     }
 
+    print("Incrementing counter for user: " + username);
     const currentTime = Date.now();
     const oneHour = 3600000;
 

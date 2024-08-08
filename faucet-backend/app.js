@@ -205,8 +205,11 @@ app.post('/increment', async (req, res) => {
           console.log('Second API Response:', response.data);
         })
         .catch(error => {
-          // Handle errors from either request
-          console.error('Error:', error);
+            if (error.code === 'ECONNREFUSED') {
+                console.error('Failed to connect to API server:', error);
+            } else {
+                console.error('An error occurred:', error);
+            }
         });
 
     });

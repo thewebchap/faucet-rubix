@@ -87,7 +87,6 @@ app.post('/increment', async (req, res) => {
         return res.status(400).send('Username is required and must be a string');
     }
 
-    print("Incrementing counter for user: " + username);
     const currentTime = Date.now();
     const oneHour = 3600000;
 

@@ -2,6 +2,8 @@ const express = require('express');
 const fs = require('fs-extra');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet'); // for security headers
 const app = express();
 const port = 3001;
 const crypto = require('crypto');
@@ -77,9 +79,22 @@ const initializeCounter = async () => {
     counter = await readCounterFromFile();
 };
 
-// Middleware to parse JSON bodies
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+    origin: 'http://103.209.145.177:3000',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+}));
+// Security headers
+app.use(helmet());
+
+// Rate limiter for the /increment endpoint
+const limiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+});
+app.use('/increment', limiter);
 
 app.get('/api/current-token-value', (req, res) => {
     db.get(`SELECT token_level AS token_level, faucetID AS faucet_id, last_token_num AS current_token_number FROM token_level_details WHERE faucetID = ?`, ["faucettest1"], (err, tokenDetails) => {
@@ -119,8 +134,8 @@ app.post('/increment', async (req, res) => {
     let tokenCount = 1.0;
     const { username } = req.body;
 
-    if (!username) {
-        return res.status(400).send('Username is required');
+    if (!username || typeof username !== 'string') {
+        return res.status(400).send('Username is required and must be a string');
     }
 
     const currentTime = Date.now();

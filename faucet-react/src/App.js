@@ -3,9 +3,11 @@ import './App.css';
 
 function App() {
   const [username, setUsername] = useState('');
+  // const [peerID, setPeerID] = useState('');
+  // const [didType, setDIDType] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-
+  // const [userDetails, setUserDetails] = useState({ usename: "", peerID: "", didType: null })
   const submitUsername = async () => {
     if (!username) {
       setMessage('Please enter DID.');
@@ -20,7 +22,7 @@ function App() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/increment', {
+      const response = await fetch('http://localhost:3001/increment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,6 +44,7 @@ function App() {
       setMessageType('error')
     }
   };
+  // console.log(userDetails,username )
 
   return (
     <div className="container">

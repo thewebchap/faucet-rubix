@@ -21,8 +21,25 @@ const db = new sqlite3.Database(dbFilePath, (err) => {
             username TEXT PRIMARY KEY,
             timestamp INTEGER
         )`);
+        db.run(`CREATE TABLE IF NOT EXISTS token_level_details (
+            faucetID TEXT PRIMARY KEY,
+            token_level INTEGER,
+            last_token_num INTEGER,
+            tokens_transferred INTEGER
+        )`);
+        db.run(`INSERT INTO token_level_details (faucetID, token_level, last_token_num, tokens_transferred) VALUES (?, ?, ?, ?)`, 
+        ["faucettest", 1, 0, 0], 
+        function(err) {
+            if (err) {
+                console.error("Error inserting initial values:", err.message);
+            } else {
+                console.log("Initial values inserted successfully.");
+            }
+        }
+    );
     }
 });
+
 
 function calculateSHA3_256Hash(number) {
     // Convert number to string
@@ -86,8 +103,42 @@ app.use('/increment', (req, res, next) => {
     }
 });
 
+app.get('/api/current-token-value', (req, res) => {
+    db.get(`SELECT token_level AS token_level, faucetID AS faucet_id, last_token_num AS current_token_number FROM token_level_details WHERE faucetID = ?`, ["faucettest1"], (err, tokenDetails) => {
+        if (err) {
+          console.error(err.message);
+          res.status(500).json({ error: "Database error" });
+          return;
+        }
+        if (tokenDetails) {
+          // Send the token details as JSON
+          res.json(tokenDetails);
+        } else {
+          res.status(404).json({ error: "Token not found" });
+        }
+      });
+  });
+
+app.post('/api/update-token-value', (req, res) => {
+    const { token_level, faucet_id, current_token_number } = req.body;
+    // Update the database with the new token details
+    db.run(
+    `UPDATE token_level_details SET token_level = ?, last_token_num = ? WHERE faucetID = ?`,
+    [token_level, current_token_number, faucet_id],
+    function (err) {
+      if (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Database update error" });
+        return;
+      }
+      res.json({ success: true });
+    }
+  );
+  });
+
 // Increment the counter and save it to the file
 app.post('/increment', async (req, res) => {
+    let tokenCount = 1.0; //Number of tokens to be transferred
     const { username } = req.body;
 
     if (!username || typeof username !== 'string') {
@@ -121,59 +172,22 @@ app.post('/increment', async (req, res) => {
             res.send(`Token value: ${hash}`);
         });
 
-        // var id;
-        // const apiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
-
-        //     const requestData = {
-        //       comment: "",
-        //       receiver: "bafybmiesr2x772guu7o4qfxywpdyqixlfcvpbocr4jgyij4ou2ff4l55aq",
-        //       sender: "bafybmiftqpvkq6sibrpjr3biallzbrmdwumlkwa37spo7iwdaxqpcpgdgm",
-        //       tokenCount: 1.0,
-        //       type: 0
-        //     };
-            
-        //     axios.post(apiUrl, requestData, {
-        //       headers: {
-        //         'Accept': 'application/json',
-        //         'Content-Type': 'application/json'
-        //       }
-        //     })
-        //       .then(response => {
-        //         console.log('Response:', response.data.result.id);
-        //       })
-        //       .catch(error => {
-        //         console.error('Error:', error.response.data);
-        //       });
-
-        //       const signapiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
-
-        //     const signrequestData = {
-        //       id: id,
-        //       password: "password",
-        //     };
-            
-        //     axios.post(signapiUrl, signrequestData, {
-        //       headers: {
-        //         'Accept': 'application/json',
-        //         'Content-Type': 'application/json'
-        //       }
-        //     })
-        //       .then(response => {
-        //         console.log('Response:', response.data.result.id);
-        //       })
-        //       .catch(error => {
-        //         console.error('Error:', error.response.data);
-        //       });
-
         const axios = require('axios');
+
+        const addPeerDetails = 'http://localhost:20000/api/add-peer-details'
+        const peerData = {
+            DID: username, // Example DID
+    DIDType: 2,  // Example DIDType
+    PeerID: "12D3KooWcbaNmVQZyZPsPUPnPRYNbkNzcDLmjkmQ8VVGZ8vHxasG"
+          };
 
         // First API URL and data
         const firstApiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
         const firstRequestData = {
           comment: "",
           receiver: username,
-          sender: "bafybmiftqpvkq6sibrpjr3biallzbrmdwumlkwa37spo7iwdaxqpcpgdgm",
-          tokenCount: 1.0,
+          sender: "bafybmif2cnmxooupsefy2rdy3vf3yt7xoojess4zedmoqvh3neezhi6uyq",
+          tokenCount: tokenCount,
           type: 2
         };
         
@@ -210,6 +224,18 @@ app.post('/increment', async (req, res) => {
         .then(response => {
           // Handle the response from the second API request
           console.log('Second API Response:', response.data);
+          db.run(
+            `UPDATE token_level_details SET tokens_transferred = tokens_transferred + ?`,
+            [tokenCount],
+            function (err) {
+              if (err) {
+                console.error(err.message);
+                res.status(500).json({ error: "Database update error" });
+                return;
+              }
+              res.json({ success: true });
+            }
+          );
         })
         .catch(error => {
           // Handle errors from either request

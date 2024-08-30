@@ -20,23 +20,31 @@ const db = new sqlite3.Database(dbFilePath, (err) => {
         db.run(`CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             timestamp INTEGER
-        )`);
+        )`, (err) => {
+          if (err) {
+              console.error('Error creating users table:', err.message);
+          }
+      });
         db.run(`CREATE TABLE IF NOT EXISTS token_level_details (
             faucetID TEXT PRIMARY KEY,
             token_level INTEGER,
             last_token_num INTEGER,
+            total_count INTEGER,
             tokens_transferred INTEGER
-        )`);
-        db.run(`INSERT INTO token_level_details (faucetID, token_level, last_token_num, tokens_transferred) VALUES (?, ?, ?, ?)`, 
-        ["faucettest", 1, 0, 0], 
-        function(err) {
-            if (err) {
-                console.error("Error inserting initial values:", err.message);
-            } else {
-                console.log("Initial values inserted successfully.");
-            }
-        }
-    );
+        )`, (err) => {
+          if (err) {
+              console.error('Error creating token_level_details table:', err.message);
+          } else {
+              // Insert initial values only after the table is created
+              db.run(`INSERT OR IGNORE INTO token_level_details (faucetID, token_level, last_token_num, total_count,tokens_transferred) VALUES (?, ?, ?, ?,?)`, 
+              ["faucettest1", 1, 0, 0, 0], 
+              function(err) {
+                  if (err) {
+                      console.error("Error inserting initial values:", err.message);
+                  }
+              });
+          }
+      });
     }
 });
 
@@ -97,7 +105,7 @@ const limiter = rateLimit({
 app.use('/increment', limiter);
 
 app.get('/api/current-token-value', (req, res) => {
-    db.get(`SELECT token_level AS token_level, faucetID AS faucet_id, last_token_num AS current_token_number FROM token_level_details WHERE faucetID = ?`, ["faucettest1"], (err, tokenDetails) => {
+    db.get(`SELECT token_level AS token_level, faucetID AS faucet_id, last_token_num AS current_token_number, total_count AS total_count FROM token_level_details WHERE faucetID = ?`, ["faucettest1"], (err, tokenDetails) => {
         if (err) {
           console.error(err.message);
           res.status(500).json({ error: "Database error" });
@@ -113,11 +121,11 @@ app.get('/api/current-token-value', (req, res) => {
   });
 
 app.post('/api/update-token-value', (req, res) => {
-    const { token_level, faucet_id, current_token_number } = req.body;
+    const { token_level, faucet_id, current_token_number, total_count } = req.body;
     // Update the database with the new token details
     db.run(
-    `UPDATE token_level_details SET token_level = ?, last_token_num = ? WHERE faucetID = ?`,
-    [token_level, current_token_number, faucet_id],
+    `UPDATE token_level_details SET token_level = ?, last_token_num = ?, total_count=? WHERE faucetID = ?`,
+    [token_level, current_token_number, total_count, faucet_id],
     function (err) {
       if (err) {
         console.error(err.message);
@@ -129,114 +137,157 @@ app.post('/api/update-token-value', (req, res) => {
   );
   });
 
-// Increment the counter and save it to the file
+// Promisified db.get function
+const dbGetAsync = (query, params) => {
+  return new Promise((resolve, reject) => {
+      db.get(query, params, (err, row) => {
+          if (err) {
+              reject(err);
+          } else {
+              resolve(row);
+          }
+      });
+  });
+};
+
+// Promisified db.run function
+const dbRunAsync = (query, params) => {
+  return new Promise((resolve, reject) => {
+      db.run(query, params, function(err) {
+          if (err) {
+              reject(err);
+          } else {
+              resolve(this);
+          }
+      });
+  });
+};
+
 app.post('/increment', async (req, res) => {
-    let tokenCount = 1.0;
-    const { username } = req.body;
+  let tokenCount = 1.0;
+  const { username } = req.body;
 
-    if (!username || typeof username !== 'string') {
-        return res.status(400).send('Username is required and must be a string');
-    }
+  if (!username || typeof username !== 'string') {
+      return res.status(400).send('Username is required and must be a string');
+  }
 
-    const currentTime = Date.now();
-    const oneHour = 3600000;
+  const currentTime = Date.now();
+  const oneHour = 3600000;
 
-    db.get('SELECT timestamp FROM users WHERE username = ?', [username], (err, row) => {
-        if (err) {
-            return res.status(500).send('Database error');
-        }
+  try {
+      // Check if the user has made a request within the last hour
+      const userRow = await dbGetAsync('SELECT timestamp FROM users WHERE username = ?', [username]);
 
-        if (row) {
-            const lastRequestTime = row.timestamp;
-            if (currentTime - lastRequestTime < oneHour) {
-                return res.status(429).send('Request denied. Try again after one hour.');
-            }
-        }
+      if (userRow) {
+          const lastRequestTime = userRow.timestamp;
+          if (currentTime - lastRequestTime < oneHour) {
+              return res.status(429).send('Request denied. Try again after one hour.');
+          }
+      }
 
-        // Update timestamp and increment counter
-        db.run('REPLACE INTO users (username, timestamp) VALUES (?, ?)', [username, currentTime], async (err) => {
-            if (err) {
-                return res.status(500).send('Database error');
-            }
+      // Update the user's timestamp
+      await dbRunAsync('REPLACE INTO users (username, timestamp) VALUES (?, ?)', [username, currentTime]);
 
-            counter++;
-            await writeCounterToFile(counter);
-            const hash = calculateSHA3_256Hash(counter);
-            res.send(`Token value: ${hash}`);
-        });
+      // Increment the counter and write it to the file
+      counter++;
+      await writeCounterToFile(counter);
+      const hash = calculateSHA3_256Hash(counter);
 
-        const axios = require('axios');
-
-        const addPeerDetails = 'http://localhost:20000/api/add-peer-details'
-        const peerData = {
-            DID: username, // Example DID
-    DIDType: 2,  // Example DIDType
-    PeerID: "12D3KooWcbaNmVQZyZPsPUPnPRYNbkNzcDLmjkmQ8VVGZ8vHxasG"
-          };
-
-        // First API URL and data
-        const firstApiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
-        const firstRequestData = {
+      // First API request
+      const firstApiUrl = 'http://localhost:20000/api/initiate-rbt-transfer';
+      const firstRequestData = {
           comment: "",
           receiver: username,
           sender: "bafybmif2cnmxooupsefy2rdy3vf3yt7xoojess4zedmoqvh3neezhi6uyq",
           tokenCount: tokenCount,
           type: 2
-        };
-        
-        // Second API URL
-        const secondApiUrl = 'http://localhost:20000/api/signature-response';
-        
-        // Make the first API request
-        axios.post(firstApiUrl, firstRequestData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        })
-        .then(response => {
-          // Extract data from the first response
-          const id = response.data.result.id;
+      };
 
-          console.log('id:', id);
-        
-          // Prepare the second request data using the response from the first request
-          const secondRequestData = {
-            id: id, // Replace with actual key from first response
-            password: 'mypassword'
-          };
-        
-          // Make the second API request
-          return axios.post(secondApiUrl, secondRequestData, {
-            headers: {
+      const firstResponse = await axios.post(firstApiUrl, firstRequestData, {
+          headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json'
-            }
-          });
-        })
-        .then(response => {
-          // Handle the response from the second API request
-          console.log('Second API Response:', response.data);
-          db.run(
-            `UPDATE token_level_details SET tokens_transferred = tokens_transferred + ?`,
-            [tokenCount],
-            function (err) {
-              if (err) {
-                console.error(err.message);
-                res.status(500).json({ error: "Database update error" });
-                return;
-              }
-              res.json({ success: true });
-            }
-          );
-        })
-        .catch(error => {
-          // Handle errors from either request
-          console.error('Error:', error);
-        });
+          }
+      });
 
-    });
+      const id = firstResponse.data.result.id;
+
+      // Second API request
+      const secondApiUrl = 'http://localhost:20000/api/signature-response';
+      const secondRequestData = {
+          id: id,
+          password: 'mypassword'
+      };
+
+      const secondResponse = await axios.post(secondApiUrl, secondRequestData, {
+          headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+          }
+      });
+
+      console.log('Second API Response:', secondResponse.data);
+
+      // Update tokens_transferred in the database
+      await dbRunAsync(
+          `UPDATE token_level_details SET tokens_transferred = tokens_transferred + ?`,
+          [tokenCount]
+      );
+
+      // Send the final response after all operations are done
+      res.json({ success: true, hash });
+
+  } catch (error) {
+      console.error('Error:', error);
+      res.status(500).send('Error processing the request.');
+  }
+
+  // Retrieve and check the difference between total_count and tokens_transferred
+  try {
+    const tokenRow = await dbGetAsync(`SELECT total_count, tokens_transferred FROM token_level_details WHERE faucetID = ?`, ['faucettest1']);
+    const difference = tokenRow.total_count - tokenRow.tokens_transferred;
+
+    if (difference < 50) {
+        // First API request
+      const firstApiUrl = 'http://localhost:20000/api/generate-faucettest-token';
+      const firstRequestData = {
+          did: "bafybmif2cnmxooupsefy2rdy3vf3yt7xoojess4zedmoqvh3neezhi6uyq",
+          token_count: 5,
+      };
+
+      const firstResponse = await axios.post(firstApiUrl, firstRequestData, {
+          headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+          }
+      });
+
+      const id = firstResponse.data.result.id;
+      console.log(id)
+
+      // Second API request
+      const secondApiUrl = 'http://localhost:20000/api/signature-response';
+      const secondRequestData = {
+          id: id,
+          password: 'mypassword'
+      };
+
+      const secondResponse = await axios.post(secondApiUrl, secondRequestData, {
+          headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+          }
+      });
+
+      console.log('Second API Response:', secondResponse.data);
+
+    }
+} catch (error) {
+    console.error('Error fetching token level details:', error);
+}
 });
+
+
 
 // Start the server after initializing the counter
 initializeCounter().then(() => {

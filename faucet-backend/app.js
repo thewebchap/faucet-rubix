@@ -87,12 +87,12 @@ const initializeCounter = async () => {
     counter = await readCounterFromFile();
 };
 
-app.use(express.json());
 app.use(cors({
     origin: 'http://103.209.145.177:3000',
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
 }));
+app.use(express.json());
 // Security headers
 app.use(helmet());
 
@@ -103,6 +103,26 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again later.',
 });
 app.use('/increment', limiter);
+
+const allowedIPs = ['localhost', '::1', '127.0.0.1','103.209.145.177'];
+
+// Allow only requests from 127.0.0.1
+app.use((req, res, next) => {
+    console.log("access")
+    const clientIP = req.socket.remoteAddress;
+    
+    console.log(clientIP)
+
+    let formattedIP = clientIP;
+    if (clientIP.startsWith('::ffff:')) {
+        formattedIP = clientIP.split('::ffff:')[1];
+    }
+    if (allowedIPs.includes(formattedIP)) {
+        next(); // Allow the request
+    } else {
+        res.status(403).json({ error: 'Access denied: Unauthorized IP or port' });
+    }
+});
 
 app.get('/api/current-token-value', (req, res) => {
     db.get(`SELECT token_level AS token_level, faucetID AS faucet_id, last_token_num AS current_token_number, total_count AS total_count FROM token_level_details WHERE faucetID = ?`, ["faucettest1"], (err, tokenDetails) => {

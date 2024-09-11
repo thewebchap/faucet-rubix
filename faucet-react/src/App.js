@@ -3,11 +3,8 @@ import './App.css';
 
 function App() {
   const [username, setUsername] = useState('');
-  // const [peerID, setPeerID] = useState('');
-  // const [didType, setDIDType] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-  // const [userDetails, setUserDetails] = useState({ usename: "", peerID: "", didType: null })
   const submitUsername = async () => {
     if (!username) {
       setMessage('Please enter DID.');

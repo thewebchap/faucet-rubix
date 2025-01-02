@@ -137,7 +137,7 @@ app.use((req, res, next) => {
     if (clientIP.startsWith('::ffff:')) {
         formattedIP = clientIP.split('::ffff:')[1];
     }
-    if (req.path === '/api/get-faucet-quorums') {
+    if (req.path === '/api/get-faucet-quorums' || req.path === '/api/current-token-value') {
         return next(); // Skip IP restrictions
     }
     if (allowedIPs.includes(formattedIP)) {

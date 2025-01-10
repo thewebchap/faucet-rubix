@@ -5,7 +5,12 @@ function App() {
   const [username, setUsername] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
-
+ 
+ async function getClientIP() {
+  const response = await fetch('https://api64.ipify.org?format=json');
+  const data = await response.json();
+  return data.ip; // Returns the public IP of the user's laptop
+}
   const submitUsername = async () => {
     if (!username) {
       setMessage('Please enter DID.');
@@ -20,7 +25,8 @@ function App() {
     }
 
     try {
-      const response = await fetch('http://103.209.145.177:3001/increment', {
+
+      const response = await fetch('/increment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,6 +48,7 @@ function App() {
       setMessageType('error')
     }
   };
+  // console.log(userDetails,username )
 
   return (
     <div className="container">
